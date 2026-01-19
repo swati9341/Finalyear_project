@@ -4,22 +4,20 @@ title ER Diagram - Automated Invoice System
 entity "user" as user {
   * id : integer <<PK>>
   --
-  email : varchar
-  password_hash : varchar
-}
-
-entity "customer" as customer {
-  * id : integer <<PK>>
-  --
   name : varchar
   email : varchar
+  phone : varchar
+  password_hash : varchar
 }
 
 entity "invoice" as invoice {
   * id : integer <<PK>>
   --
   invoice_number : varchar
-  customer_id : integer <<FK>>
+  user_id : integer <<FK>>
+  customer_name : varchar
+  customer_email : varchar
+  customer_phone : varchar
   subtotal : numeric
   tax : numeric
   total : numeric
@@ -36,11 +34,11 @@ entity "invoice_item" as invoice_item {
   price : numeric
 }
 
-customer ||--o{ invoice : places
+user ||--o{ invoice : creates
 invoice ||--o{ invoice_item : contains
 
 note left of invoice
-  - invoice.customer_id references customer.id
+  - invoice.user_id references user.id
   - invoice_item.invoice_id references invoice.id
 end note
 

@@ -35,7 +35,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     hashed = bcrypt_sha256.hash(user.password)
     print("HASHED:", hashed)
 
-    db_user = User(email=user.email, password_hash=hashed)
+    db_user = User(name=user.name, email=user.email, phone=user.phone, password_hash=hashed)
     db.add(db_user)
     db.commit()
 

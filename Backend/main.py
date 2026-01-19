@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from routers import auth
 from database import Base, engine
 from routers import invoices
-from models import user, customer, invoice, invoice_item
+from models import user, invoice, invoice_item
 
 Base.metadata.create_all(bind=engine)
 

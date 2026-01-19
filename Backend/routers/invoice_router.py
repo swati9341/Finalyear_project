@@ -37,7 +37,10 @@ def create_invoice(
 
     invoice = Invoice(
         invoice_number=invoice_no,
-        customer_id=data.customer_id,
+        user_id=data.user_id,
+        customer_name=data.customer_name,
+        customer_email=data.customer_email,
+        customer_phone=data.customer_phone,
         subtotal=subtotal,
         tax=data.tax,
         total=total

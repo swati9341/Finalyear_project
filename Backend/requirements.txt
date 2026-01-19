@@ -9,3 +9,4 @@ reportlab
 python-dotenv
 streamlit
 requests
+streamlit-shadcn-ui

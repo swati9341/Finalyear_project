@@ -4,11 +4,16 @@ This is a small FastAPI backend for creating invoices from a JSON payload and ge
 
 Quick overview
 - Endpoints:
-  - POST /auth/register — register user
+  - POST /auth/register — register user (requires name, email, phone, password)
   - POST /auth/login — login and receive access token
-  - POST /invoices/create — create an invoice (JSON request body)
+  - POST /invoices/create — create an invoice (JSON request body with user_id, customer details, tax, items)
   - GET /invoices/{id} — get invoice JSON
   - GET /invoices/{id}/pdf — download invoice PDF
+
+Database Schema:
+- `users`: id, name, email, phone, password_hash
+- `invoices`: id, invoice_number, user_id, customer_name, customer_email, customer_phone, subtotal, tax, total, pdf_path
+- `invoice_items`: id, invoice_id, description, quantity, price
 
 Requirements
 - Python 3.11+ (project was developed with 3.12)

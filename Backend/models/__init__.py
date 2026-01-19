@@ -1,4 +1,4 @@
 """Models package initializer: expose individual model modules."""
-from . import user, customer, invoice, invoice_item
+from . import user, invoice, invoice_item
 
-__all__ = ["user", "customer", "invoice", "invoice_item"]
+__all__ = ["user", "invoice", "invoice_item"]
