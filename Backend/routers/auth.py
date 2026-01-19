@@ -46,7 +46,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login")
 def login(
     user: UserLogin = Body(
-        ..., examples={"default": {"summary": "Sample login", "value": UserLogin.Config.schema_extra["example"]}},
+        ..., examples={"default": {"summary": "Sample login", "value": UserLogin.Config.json_schema_extra["example"]}},
     ),
     db: Session = Depends(get_db),
 ):

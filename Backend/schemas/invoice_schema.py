@@ -14,7 +14,7 @@ class InvoiceCreate(BaseModel):
     items: List[InvoiceItemCreate]
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "customer_id": 123,
                 "tax": 2.5,

@@ -24,7 +24,7 @@ def create_invoice(
         examples={
             "default": {
                 "summary": "Sample invoice",
-                "value": InvoiceCreate.Config.schema_extra["example"],
+                "value": InvoiceCreate.Config.json_schema_extra["example"],
             }
         },
     ),

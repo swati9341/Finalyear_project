@@ -1,0 +1,47 @@
+@startuml
+title ER Diagram - Automated Invoice System
+
+entity "user" as user {
+  * id : integer <<PK>>
+  --
+  email : varchar
+  password_hash : varchar
+}
+
+entity "customer" as customer {
+  * id : integer <<PK>>
+  --
+  name : varchar
+  email : varchar
+}
+
+entity "invoice" as invoice {
+  * id : integer <<PK>>
+  --
+  invoice_number : varchar
+  customer_id : integer <<FK>>
+  subtotal : numeric
+  tax : numeric
+  total : numeric
+  pdf_path : varchar
+  created_at : datetime
+}
+
+entity "invoice_item" as invoice_item {
+  * id : integer <<PK>>
+  --
+  invoice_id : integer <<FK>>
+  description : varchar
+  quantity : numeric
+  price : numeric
+}
+
+customer ||--o{ invoice : places
+invoice ||--o{ invoice_item : contains
+
+note left of invoice
+  - invoice.customer_id references customer.id
+  - invoice_item.invoice_id references invoice.id
+end note
+
+@enduml
