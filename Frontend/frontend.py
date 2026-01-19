@@ -1,11 +1,19 @@
 import streamlit as st
 import streamlit_shadcn_ui as st_shadcn_ui
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 st.title("Invoice System - Login/Signup")
 
-# Backend URL - adjust if needed
-BACKEND_URL = "http://localhost:8000"
+# Backend URL - loaded from .env file
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+
+# Initialize session state for token
+if "token" not in st.session_state:
+    st.session_state.token = None
 
 tab1, tab2 = st.tabs(["Login", "Signup"])
 
@@ -18,8 +26,9 @@ with tab1:
             response = requests.post(f"{BACKEND_URL}/auth/login", json={"email": email, "password": password})
             if response.status_code == 200:
                 token = response.json()["access_token"]
+                st.session_state.token = token
                 st.success("Login successful!")
-                st.write(f"Access Token: {token}")  # In a real app, store securely
+                st.rerun()  # Refresh to show logged-in state
             else:
                 st.error("Invalid credentials")
         except Exception as e:
@@ -27,7 +36,7 @@ with tab1:
 
 with tab2:
     st.header("Signup")
-    name = st_shadcn_ui.input("Name", key="signup_name")  # Note: Backend doesn't use name, but keeping for UI
+    name = st_shadcn_ui.input("Name", key="signup_name")
     email = st_shadcn_ui.input("Email", key="signup_email")
     phone = st_shadcn_ui.input("Phone", key="signup_phone")
     password = st_shadcn_ui.input("Password", type="password", key="signup_password")
@@ -44,3 +53,12 @@ with tab2:
                     st.error("Signup failed")
             except Exception as e:
                 st.error(f"Error: {e}")
+
+# If logged in, show a simple message or additional features
+if st.session_state.token:
+    st.header("Welcome! You are logged in.")
+    st.write("Token stored securely in session state.")
+    # Example: Add invoice creation here later
+    if st.button("Logout"):
+        st.session_state.token = None
+        st.rerun()
