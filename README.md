@@ -6,9 +6,9 @@ This repository contains a Backend (FastAPI) and Frontend (Streamlit) implementa
 
 ## Features
 
-- **Backend**: User registration and login, invoice creation with PDF generation.
+- **Backend**: User registration and login, invoice creation with PDF generation, invoice template management.
 - **Frontend**: Streamlit UI for login/signup, integrated with backend APIs.
-- **Database**: SQLite (default) or MySQL support. Tables: `users`, `invoices`, `invoice_items`.
+- **Database**: SQLite (default) or MySQL support. Tables: `users`, `invoices`, `invoice_items`, `invoice_templates`.
 
 Quick links
 - Backend README: `Backend/README.md` — detailed setup, API docs, and notes.
@@ -42,7 +42,8 @@ Access the frontend at `http://localhost:8501`.
 - Updated invoice creation to include customer info inline.
 - Frontend integrated with backend auth APIs.
 - Enhanced PDF generation with customer details.
+- Added invoice template management with create, list, and get endpoints.
 
 ER diagram
-- The ER diagram describes these main entities: `user`, `invoice`, `invoice_item`.
+- The ER diagram describes these main entities: `user`, `invoice`, `invoice_item`, `invoice_template`.
 
