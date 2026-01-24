@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from database import SessionLocal
+from models.invoice_template import InvoiceTemplate as InvoiceTemplateModel # Import InvoiceTemplateModel
 from models.invoice_item import InvoiceItem as InvoiceItemModel
 from schemas.invoice_item_schema import (
     InvoiceItemCreate,
@@ -27,10 +28,17 @@ def get_db():
     summary="Create an invoice item"
 )
 def create_invoice_item(data: InvoiceItemCreate, db: Session = Depends(get_db)):
+    # Check if the invoice_id corresponds to an existing InvoiceTemplate
+    invoice_template = db.query(InvoiceTemplateModel).filter(InvoiceTemplateModel.id == data.invoice_id).first()
+    if not invoice_template:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Invoice Template with ID {data.invoice_id} not found.")
+
+    # If template exists, proceed to create the invoice item
     db_invoice_item = InvoiceItemModel(
         invoice_id=data.invoice_id,
         userId=data.userId,
-        description=data.description
+        description=data.description,
+        data=data.data # Added data field
     )
     db.add(db_invoice_item)
     db.commit()

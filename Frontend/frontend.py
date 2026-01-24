@@ -40,6 +40,16 @@ def fetch_templates():
         st.error(f"Error fetching templates: {e}")
         return []
 
+def fetch_demo_invoices():
+    try:
+        # The /demo/invoice endpoint does not require authentication for this example
+        res = requests.get(f"{BACKEND_URL}/demo/invoice")
+        if res.status_code == 200:
+            return res.json()
+        return []
+    except Exception as e:
+        st.error(f"Error fetching demo invoices: {e}")
+        return []
 
 # -----------------------------
 # LOGIN/SIGNUP UI
@@ -140,12 +150,8 @@ def dashboard_ui():
         with colB:
             filter_value = st.selectbox("Filter", ["All", "This Month", "Last 30 Days"])
 
-        demo_invoices = [
-            {"Invoice No": "INV-1001", "Customer": "Ravi Kumar", "Date": "2026-01-24", "Total": "₹1200"},
-            {"Invoice No": "INV-1002", "Customer": "Aman Singh", "Date": "2026-01-23", "Total": "₹2100"},
-        ]
-
-        st.dataframe(demo_invoices, use_container_width=True)
+        fetched_demo_invoices = fetch_demo_invoices()
+        st.dataframe(fetched_demo_invoices, use_container_width=True)
 
         st.caption("✅ Later: Add View / Download PDF buttons per invoice")
 

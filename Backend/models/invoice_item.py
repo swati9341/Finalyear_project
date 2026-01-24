@@ -10,4 +10,5 @@ class InvoiceItem(Base):
     invoice_id = Column(Integer)
     userId = Column(Integer, ForeignKey("users.id"), nullable=False)
     description = Column(String(255))
+    data = Column(String(255))  # Assuming JSON data is stored as a string
     created_at = Column(DateTime, default=datetime.utcnow())
