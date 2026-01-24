@@ -8,6 +8,9 @@ Quick overview
   - POST /auth/login — login and receive access token
   - POST /invoices/create — create an invoice (JSON request body with user_id, customer details, tax, items)
   - GET /invoices/{id} — get invoice JSON
+  - POST /invoice_items/ — create an invoice item (JSON request body with invoice_id, userId, description)
+  - GET /invoice_items/ — list all invoice items
+  - GET /invoice_items/{item_id} — get an invoice item by ID
   - GET /invoices/{id}/pdf — download invoice PDF
 
 Database Schema:

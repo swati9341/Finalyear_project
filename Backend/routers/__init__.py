@@ -1,6 +1,7 @@
 """Routers package initializer - expose named router modules for convenience."""
-from . import invoice_router as invoices
 from . import auth as auth
 from . import template_router as template_router
+from . import invoice_item_router as invoice_item_router # Added invoice_item_router
 
-__all__ = ["invoices", "auth", "template_router"]
+__all__ = [ "auth", "template_router"]
+__all__ = [ "auth", "template_router", "invoice_item_router"]
