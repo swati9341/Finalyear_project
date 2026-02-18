@@ -5,6 +5,10 @@ from database import SessionLocal
 from models.user import User
 from schemas.user_schema import UserCreate, UserLogin
 from utils.jwt_handler import create_access_token
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -29,17 +33,22 @@ from passlib.hash import bcrypt_sha256
 
 @router.post("/register")
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    print("RAW:", repr(user.password))
-    print("LEN:", len(user.password))
+    logger.info(f"Registration attempt for email: {user.email}")
+    logger.debug(f"Password length: {len(user.password)}")
+    
+    try:
+        hashed = bcrypt_sha256.hash(user.password)
+        logger.debug(f"Password hashed successfully")
 
-    hashed = bcrypt_sha256.hash(user.password)
-    print("HASHED:", hashed)
+        db_user = User(name=user.name, email=user.email, phone=user.phone, password_hash=hashed)
+        db.add(db_user)
+        db.commit()
+        logger.info(f"User registered successfully: {user.email}")
 
-    db_user = User(name=user.name, email=user.email, phone=user.phone, password_hash=hashed)
-    db.add(db_user)
-    db.commit()
-
-    return {"message": "User registered"}
+        return {"message": "User registered"}
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
 
 
 
@@ -50,8 +59,26 @@ def login(
     ),
     db: Session = Depends(get_db),
 ):
+    logger.info(f"Login attempt for email: {user.email}")
+    logger.debug(f"Password length: {len(user.password)}")
+    
     db_user = db.query(User).filter(User.email == user.email).first()
-    if not db_user or not bcrypt_sha256.verify(user.password, db_user.password_hash):
+    
+    if not db_user:
+        logger.warning(f"Login failed - User not found: {user.email}")
         raise HTTPException(status_code=400, detail="Invalid credentials")
+    
+    logger.debug(f"User found in database: {user.email}")
+    logger.debug(f"Stored hash length: {len(db_user.password_hash)}")
+    
+    password_match = bcrypt_sha256.verify(user.password, db_user.password_hash)
+    logger.debug(f"Password verification result: {password_match}")
+    
+    if not password_match:
+        logger.warning(f"Login failed - Invalid password for user: {user.email}")
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    
+    logger.info(f"Login successful for user: {user.email}")
     token = create_access_token({"user_id": db_user.id})
-    return {"access_token": token}
+    logger.debug(f"Token created for user: {user.email}")
+    return {"access_token": token, "user_id": db_user.id}

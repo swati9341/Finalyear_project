@@ -14,6 +14,7 @@ class InvoiceItemCreate(InvoiceItemBase):
 class InvoiceItem(InvoiceItemBase):
     id: int
     created_at: datetime
+    template_name: Optional[str] = None
 
     class Config:
         from_attributes = True

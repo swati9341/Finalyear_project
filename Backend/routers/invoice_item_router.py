@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
+import logging
+import json
+import re
+from io import BytesIO
+from pyhtml2pdf.converter import convert
 
 from database import SessionLocal
 from models.invoice_template import InvoiceTemplate as InvoiceTemplateModel # Import InvoiceTemplateModel
@@ -9,6 +15,8 @@ from schemas.invoice_item_schema import (
     InvoiceItemCreate,
     InvoiceItem as InvoiceItemSchema
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/invoice_items", tags=["Invoice Items"])
 
@@ -53,6 +61,10 @@ def create_invoice_item(data: InvoiceItemCreate, db: Session = Depends(get_db)):
 )
 def list_invoice_items(db: Session = Depends(get_db)):
     invoice_items = db.query(InvoiceItemModel).all()
+    # Enrich each item with template information
+    for item in invoice_items:
+        template = db.query(InvoiceTemplateModel).filter(InvoiceTemplateModel.id == item.invoice_id).first()
+        item.template_name = template.template_name if template else None
     return invoice_items
 
 # Get Invoice Item by ID
@@ -66,3 +78,73 @@ def get_invoice_item(item_id: int, db: Session = Depends(get_db)):
     if not invoice_item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice item not found")
     return invoice_item
+
+
+# Generate PDF from Invoice Item
+@router.get(
+    "/{item_id}/pdf",
+    summary="Generate PDF from invoice item"
+)
+def generate_invoice_pdf(item_id: int, db: Session = Depends(get_db)):
+    """Generate PDF by replacing placeholders in template HTML with invoice item data"""
+    logger.info(f"Generating PDF for invoice item: {item_id}")
+    
+    # Fetch the invoice item
+    invoice_item = db.query(InvoiceItemModel).filter(InvoiceItemModel.id == item_id).first()
+    if not invoice_item:
+        logger.error(f"Invoice item not found: {item_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice item not found")
+    
+    # Fetch the template
+    template = db.query(InvoiceTemplateModel).filter(
+        InvoiceTemplateModel.id == invoice_item.invoice_id
+    ).first()
+    if not template:
+        logger.error(f"Template not found for invoice_id: {invoice_item.invoice_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    
+    logger.debug(f"Template found: {template.template_name}")
+    
+    try:
+        # Parse the invoice item data
+        if isinstance(invoice_item.data, str):
+            data = json.loads(invoice_item.data)
+        else:
+            data = invoice_item.data
+        
+        logger.debug(f"Invoice data: {data}")
+        
+        # Get the HTML content from template
+        html_content = template.html_content
+        
+        # Replace placeholders in HTML with actual data
+        # Placeholders are expected to be in format: {{key}} or {key}
+        for key, value in data.items():
+            # Replace {{key}} format
+            html_content = html_content.replace(f"{{{{{key}}}}}", str(value))
+            # Replace {key} format
+            html_content = html_content.replace(f"{{{key}}}", str(value))
+        
+        logger.debug("Placeholders replaced successfully")
+        
+        # Generate PDF from HTML using pyhtml2pdf
+        output_pdf = BytesIO()
+        convert(source=html_content, target=output_pdf)
+        pdf_bytes = output_pdf.getvalue()
+        
+        logger.info(f"PDF generated successfully for invoice item: {item_id}")
+        
+        # Return PDF as streaming response
+        output_pdf.seek(0)
+        return StreamingResponse(
+            output_pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename=invoice_{item_id}.pdf"}
+        )
+    
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse invoice data JSON: {str(e)}")
+        raise HTTPException(status_code=400, detail="Invalid invoice data format")
+    except Exception as e:
+        logger.error(f"Error generating PDF: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")

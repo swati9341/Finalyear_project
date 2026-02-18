@@ -19,23 +19,24 @@ def get_db():
         db.close()
 
 @router.get(
-    "/invoice",
+    "/invoice/{user_id}",
     response_model=List[DemoInvoice], # Return a list of demo invoices
-    summary="Get demo invoice data from the database"
+    summary="Get demo invoice data for a specific user from the database"
 )
-def get_demo_invoices_from_db(db: Session = Depends(get_db)):
+def get_demo_invoices_from_db(user_id: int, db: Session = Depends(get_db)):
     # Query InvoiceItem, join with User and InvoiceTemplate
     # We'll fetch a few items to demonstrate a list
     invoice_items_data = (
         db.query(InvoiceItemModel, UserModel, InvoiceTemplateModel)
         .join(UserModel, InvoiceItemModel.userId == UserModel.id)
         .join(InvoiceTemplateModel, InvoiceItemModel.invoice_id == InvoiceTemplateModel.id)
+        .filter(UserModel.id == user_id) # Filter by user_id
         .limit(5) # Limit to a few for demo purposes
         .all()
     )
 
     if not invoice_items_data:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No demo invoice data found in the database. Please create some invoice items and templates.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No demo invoice data found for user ID {user_id} in the database. Please create some invoice items and templates for this user.")
 
     demo_invoices = []
     for item, user, template in invoice_items_data:

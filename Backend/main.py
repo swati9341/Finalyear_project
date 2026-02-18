@@ -4,6 +4,13 @@ from database import Base, engine
 from routers import template_router
 from routers import invoice_item_router, demo_router # Added invoice_item_router, demo_router
 from models import user, invoice_item, invoice_template, invoice # Added invoice model for relationships
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 Base.metadata.create_all(bind=engine)
 
