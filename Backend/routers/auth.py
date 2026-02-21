@@ -5,6 +5,7 @@ from database import SessionLocal
 from models.user import User
 from schemas.user_schema import UserCreate, UserLogin
 from utils.jwt_handler import create_access_token
+from utils.db_helpers import create_record, read_record_by_email
 import logging
 
 logger = logging.getLogger(__name__)
@@ -41,11 +42,27 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         logger.debug(f"Password hashed successfully")
 
         db_user = User(name=user.name, email=user.email, phone=user.phone, password_hash=hashed)
-        db.add(db_user)
-        db.commit()
+        
+        # Create with Supabase-first fallback
+        created_user = create_record(
+            db,
+            db_user,
+            table_name="users",
+            supabase_data={
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "password_hash": hashed
+            }
+        )
+        
+        if not created_user:
+            raise HTTPException(status_code=500, detail="Failed to register user")
+        
         logger.info(f"User registered successfully: {user.email}")
-
         return {"message": "User registered"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Registration error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
@@ -62,16 +79,34 @@ def login(
     logger.info(f"Login attempt for email: {user.email}")
     logger.debug(f"Password length: {len(user.password)}")
     
-    db_user = db.query(User).filter(User.email == user.email).first()
+    # Query with Supabase-first fallback for existing users
+    fetched_user = read_record_by_email(
+        db,
+        "users",
+        user.email,
+        lambda: db.query(User).filter(User.email == user.email).first()
+    )
     
-    if not db_user:
+    if not fetched_user:
         logger.warning(f"Login failed - User not found: {user.email}")
         raise HTTPException(status_code=400, detail="Invalid credentials")
     
+    # Extract user data, handling both SQLAlchemy object and dictionary
+    if isinstance(fetched_user, dict):
+        db_user_id = fetched_user.get("id")
+        password_hash = fetched_user.get("password_hash")
+    else: # SQLAlchemy object
+        db_user_id = fetched_user.id
+        password_hash = fetched_user.password_hash
+        
+    if not password_hash:
+        logger.error(f"Password hash not found for user: {user.email}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
     logger.debug(f"User found in database: {user.email}")
-    logger.debug(f"Stored hash length: {len(db_user.password_hash)}")
+    logger.debug(f"Stored hash length: {len(password_hash)}")
     
-    password_match = bcrypt_sha256.verify(user.password, db_user.password_hash)
+    password_match = bcrypt_sha256.verify(user.password, password_hash)
     logger.debug(f"Password verification result: {password_match}")
     
     if not password_match:
@@ -79,6 +114,6 @@ def login(
         raise HTTPException(status_code=400, detail="Invalid credentials")
     
     logger.info(f"Login successful for user: {user.email}")
-    token = create_access_token({"user_id": db_user.id})
+    token = create_access_token({"user_id": db_user_id})
     logger.debug(f"Token created for user: {user.email}")
-    return {"access_token": token, "user_id": db_user.id}
+    return {"access_token": token, "user_id": db_user_id}

@@ -13,8 +13,20 @@ DB_HOST = os.getenv("DB_HOST", "localhost")
 
 logger = logging.getLogger(__name__)
 
-# Prefer explicit MySQL connection if credentials are provided, otherwise fall back to SQLite for
-# local development. You can also set DATABASE_URL env var to override.
+# Database Priority:
+# 1. Primary: Supabase (if SUPABASE_URL and SUPABASE_KEY are set)
+# 2. Fallback: MySQL (if DB_USER, DB_PASS, DB_NAME are set)
+# 3. Final Fallback: SQLite (local file)
+#
+# To use Supabase as primary, set environment variables:
+#   SUPABASE_URL=https://your-project.supabase.co
+#   SUPABASE_KEY=your-anon-key
+#
+# For MySQL fallback, set:
+#   DB_USER=your_mysql_user
+#   DB_PASS=your_mysql_password
+#   DB_NAME=your_database_name
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
 	if DB_USER and DB_PASS and DB_NAME:

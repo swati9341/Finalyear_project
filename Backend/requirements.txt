@@ -11,3 +11,4 @@ streamlit
 requests
 streamlit-shadcn-ui
 pyhtml2pdf
+supabase

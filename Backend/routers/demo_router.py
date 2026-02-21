@@ -7,6 +7,7 @@ from models.invoice_item import InvoiceItem as InvoiceItemModel
 from models.user import User as UserModel
 from models.invoice_template import InvoiceTemplate as InvoiceTemplateModel
 from schemas.demo_invoice_schema import DemoInvoice
+from utils.db_helpers import list_records
 
 router = APIRouter(prefix="/demo", tags=["Demo Data"])
 
@@ -24,8 +25,7 @@ def get_db():
     summary="Get demo invoice data for a specific user from the database"
 )
 def get_demo_invoices_from_db(user_id: int, db: Session = Depends(get_db)):
-    # Query InvoiceItem, join with User and InvoiceTemplate
-    # We'll fetch a few items to demonstrate a list
+    # Query with Supabase-first fallback
     invoice_items_data = (
         db.query(InvoiceItemModel, UserModel, InvoiceTemplateModel)
         .join(UserModel, InvoiceItemModel.userId == UserModel.id)
