@@ -53,28 +53,39 @@ def create_invoice_item(data: InvoiceItemCreate):
 # -----------------------------------------
 # LIST ALL INVOICE ITEMS
 # -----------------------------------------
+from fastapi import Query
+
 @router.get(
     "/",
     response_model=List[InvoiceItemSchema],
     summary="List all invoice items"
 )
-def list_invoice_items():
+def list_invoice_items(user_id: int= Query(...)):
     # List records directly from Supabase
-    invoice_items: Optional[List[Dict[str, Any]]] = list_records(
-        "invoice_items",
-    )
-    
+    invoice_items: Optional[List[Dict[str, Any]]] = list_records("invoice_items")
+
+    # Fix: if DB returns None
     if invoice_items is None:
-        raise HTTPException(status_code=500, detail="Failed to fetch invoice items")
+        invoice_items = []
     
+    print(f"Fetched {len(invoice_items)} invoice items from Supabase")
+    print(f"Filtering for user_id: {user_id}")
+
+    # Filter by userId (match DB column)
+    invoice_items = [
+        item for item in invoice_items if item.get("userId") == user_id
+    ]
+
     # Enrich each item with template information
-    # Convert dict to Pydantic schema
     for item in invoice_items:
         invoice_id = item.get("invoice_id")
-        # Query template with the extracted invoice_id
+
         template = read_record("invoice_templates", invoice_id)
-        item['template_name'] = template.get("template_name") if template else None
-    
+
+        item["template_name"] = (
+            template.get("template_name") if template else None
+        )
+
     return [InvoiceItemSchema(**item) for item in invoice_items]
 
 
