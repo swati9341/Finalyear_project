@@ -1,32 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict, Any, Optional
 import logging
 import json
 from io import BytesIO
-from pyhtml2pdf.converter import convert
+from fpdf import FPDF
 
-from database import SessionLocal
-from models.invoice_template import InvoiceTemplate as InvoiceTemplateModel
-from models.invoice_item import InvoiceItem as InvoiceItemModel
 from schemas.invoice_item_schema import (
     InvoiceItemCreate,
     InvoiceItem as InvoiceItemSchema
 )
 from utils.db_helpers import create_record, read_record, list_records
+from supabase_client import supabase_fallback # Import supabase_fallback directly for template check
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/invoice_items", tags=["Invoice Items"])
-
-# DB Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # -----------------------------------------
@@ -38,23 +27,14 @@ def get_db():
     status_code=status.HTTP_201_CREATED,
     summary="Create an invoice item"
 )
-def create_invoice_item(data: InvoiceItemCreate, db: Session = Depends(get_db)):
+def create_invoice_item(data: InvoiceItemCreate):
     # Check if the invoice_id corresponds to an existing InvoiceTemplate
-    invoice_template = db.query(InvoiceTemplateModel).filter(InvoiceTemplateModel.id == data.invoice_id).first()
+    invoice_template = read_record("invoice_templates", data.invoice_id)
     if not invoice_template:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Invoice Template with ID {data.invoice_id} not found.")
 
-    # If template exists, proceed to create the invoice item with Supabase-first fallback
-    db_invoice_item = InvoiceItemModel(
-        invoice_id=data.invoice_id,
-        userId=data.userId,
-        description=data.description,
-        data=data.data
-    )
-    
+    # If template exists, proceed to create the invoice item
     created_item = create_record(
-        db,
-        db_invoice_item,
         table_name="invoice_items",
         supabase_data={
             "invoice_id": data.invoice_id,
@@ -67,7 +47,7 @@ def create_invoice_item(data: InvoiceItemCreate, db: Session = Depends(get_db)):
     if not created_item:
         raise HTTPException(status_code=500, detail="Failed to create invoice item")
     
-    return created_item
+    return InvoiceItemSchema(**created_item)
 
 
 # -----------------------------------------
@@ -78,34 +58,24 @@ def create_invoice_item(data: InvoiceItemCreate, db: Session = Depends(get_db)):
     response_model=List[InvoiceItemSchema],
     summary="List all invoice items"
 )
-def list_invoice_items(db: Session = Depends(get_db)):
-    # List with Supabase-first fallback
-    invoice_items = list_records(
-        db,
+def list_invoice_items():
+    # List records directly from Supabase
+    invoice_items: Optional[List[Dict[str, Any]]] = list_records(
         "invoice_items",
-        lambda: db.query(InvoiceItemModel).all()
     )
     
     if invoice_items is None:
         raise HTTPException(status_code=500, detail="Failed to fetch invoice items")
     
     # Enrich each item with template information
+    # Convert dict to Pydantic schema
     for item in invoice_items:
-        # Extract invoice_id based on response type
-        if isinstance(item, dict):
-            invoice_id = item.get("invoice_id")
-        else:
-            invoice_id = item.invoice_id
-        
+        invoice_id = item.get("invoice_id")
         # Query template with the extracted invoice_id
-        template = db.query(InvoiceTemplateModel).filter(InvoiceTemplateModel.id == invoice_id).first()
-        
-        if isinstance(item, dict):
-            item['template_name'] = template.template_name if template else None
-        else:
-            item.template_name = template.template_name if template else None
+        template = read_record("invoice_templates", invoice_id)
+        item['template_name'] = template.get("template_name") if template else None
     
-    return invoice_items
+    return [InvoiceItemSchema(**item) for item in invoice_items]
 
 
 # -----------------------------------------
@@ -116,63 +86,46 @@ def list_invoice_items(db: Session = Depends(get_db)):
     response_model=InvoiceItemSchema,
     summary="Get invoice item by ID"
 )
-def get_invoice_item(item_id: int, db: Session = Depends(get_db)):
-    # Get with Supabase-first fallback
-    invoice_item = read_record(
-        db,
+def get_invoice_item(item_id: int):
+    # Get record directly from Supabase
+    invoice_item: Optional[Dict[str, Any]] = read_record(
         "invoice_items",
         item_id,
-        lambda: db.query(InvoiceItemModel).filter(InvoiceItemModel.id == item_id).first()
     )
-    
     if not invoice_item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice item not found")
     
-    return invoice_item
+    return InvoiceItemSchema(**invoice_item)
 
 
 # -----------------------------------------
 # GENERATE PDF
 # -----------------------------------------
 @router.get("/{item_id}/pdf", summary="Generate PDF from invoice item")
-def generate_invoice_pdf(item_id: int, db: Session = Depends(get_db)):
+def generate_invoice_pdf(item_id: int):
     """Generate PDF by replacing placeholders in template HTML with invoice item data"""
     logger.info(f"Generating PDF for invoice item: {item_id}")
     
-    # Fetch the invoice item with Supabase-first fallback
-    invoice_item = read_record(
-        db,
+    # Fetch the invoice item directly from Supabase
+    invoice_item: Optional[Dict[str, Any]] = read_record(
         "invoice_items",
         item_id,
-        lambda: db.query(InvoiceItemModel).filter(InvoiceItemModel.id == item_id).first()
     )
-    
     if not invoice_item:
         logger.error(f"Invoice item not found: {item_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice item not found")
     
-    # Extract invoice_id based on response type
-    if isinstance(invoice_item, dict):
-        invoice_id = invoice_item.get("invoice_id")
-    else:
-        invoice_id = invoice_item.invoice_id
-    
+    invoice_id = invoice_item.get("invoice_id")
     # Fetch the template
-    template = db.query(InvoiceTemplateModel).filter(
-        InvoiceTemplateModel.id == invoice_id
-    ).first()
+    template: Optional[Dict[str, Any]] = read_record("invoice_templates", invoice_id)
     if not template:
         logger.error(f"Template not found for invoice_id: {invoice_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
     
-    logger.debug(f"Template found: {template.template_name}")
+    logger.debug(f"Template found: {template.get('template_name')}")
     
     try:
-        # Parse the invoice item data
-        if isinstance(invoice_item, dict):
-            data_str = invoice_item.get("data")
-        else:
-            data_str = invoice_item.data
+        data_str = invoice_item.get("data")
             
         if isinstance(data_str, str):
             data = json.loads(data_str)
@@ -182,7 +135,7 @@ def generate_invoice_pdf(item_id: int, db: Session = Depends(get_db)):
         logger.debug(f"Invoice data: {data}")
         
         # Get the HTML content from template
-        html_content = template.html_content
+        html_content = template.get("html_content")
         
         # Replace placeholders in HTML with actual data
         for key, value in data.items():
@@ -193,10 +146,19 @@ def generate_invoice_pdf(item_id: int, db: Session = Depends(get_db)):
         
         logger.debug("Placeholders replaced successfully")
         
-        # Generate PDF from HTML using pyhtml2pdf
-        output_pdf = BytesIO()
-        convert(source=html_content, target=output_pdf)
-        pdf_bytes = output_pdf.getvalue()
+        # Generate PDF using fpdf2's write_html() directly
+        pdf = FPDF(format='A4')
+        pdf.set_auto_page_break(False)
+        pdf.set_margins(15, 15, 15)
+        pdf.add_page()
+
+        pdf.set_font("Arial", size=11)
+
+        for line in html_content:
+            pdf.cell(0, 8, line, ln=True)
+
+        pdf_bytes = pdf.output(dest="S")
+        output_pdf = BytesIO(pdf_bytes)
         
         logger.info(f"PDF generated successfully for invoice item: {item_id}")
         

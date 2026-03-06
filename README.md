@@ -49,8 +49,8 @@ This will start:
 To run the backend server:
 
 ```powershell
-cd Backend
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd Backend # Navigate to the Backend directory
+python -m uvicorn app:app --reload --host 0.0.0.0 --port 8000 # Run the FastAPI application
 ```
 
 ## Running Frontend Only
@@ -75,4 +75,3 @@ Access the frontend at `http://localhost:8501`.
 
 ER diagram
 - The ER diagram describes these main entities: `user`, `invoice`, `invoice_item`, `invoice_template`.
-

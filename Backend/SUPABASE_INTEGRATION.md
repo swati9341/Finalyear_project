@@ -1,20 +1,15 @@
 # Supabase Integration
 
-This project now supports **Supabase-first database strategy** with automatic fallback to MySQL/SQLite. This provides a cloud-native solution with local database backup for resilience.
+This project now uses a **Supabase-only database strategy**. All database operations are directed to Supabase.
 
 ## How It Works
 
-The application uses a **tiered database strategy**:
-
-1. **Primary**: Supabase (cloud-based PostgreSQL)
-2. **Secondary**: MySQL (if credentials are provided)
-3. **Fallback**: SQLite (local file-based database)
-
-When a database operation fails on Supabase, the system automatically attempts the same operation on the MySQL database. If that also fails, it falls back to SQLite.
+The application directly interacts with Supabase for all data persistence. There are no fallback mechanisms to other databases (MySQL/SQLite) implemented in the backend code.
 
 ## Setup Instructions
 
 ### 1. Install Dependencies
+Ensure `supabase` is in your `requirements.txt`.
 
 ```bash
 pip install -r requirements.txt
@@ -24,7 +19,7 @@ The `supabase` package is now included in `requirements.txt`.
 
 ### 2. Configure Environment Variables
 
-Copy `.env.example` to `.env` and configure your Supabase credentials:
+Copy `.env.example` to `.env` and configure your Supabase credentials. These are **mandatory** for the application to function.
 
 ```bash
 cp .env.example .env
@@ -35,6 +30,10 @@ Edit `.env` and add:
 ```env
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_KEY=your-anon-key
+ 
+# For JWT token generation (mandatory for authentication)
+SECRET_KEY=your_secret_key_for_jwt_generation_and_verification
+ALGORITHM=HS256 # Common algorithm like HS256
 ```
 
 ### 3. Set Up Supabase Tables

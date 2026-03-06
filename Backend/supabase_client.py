@@ -6,9 +6,7 @@ This module provides fallback database connectivity when the primary database is
 import os
 import logging
 from typing import Optional, List, Dict, Any
-from dotenv import load_dotenv
 
-load_dotenv()
 
 logger = logging.getLogger(__name__)
 

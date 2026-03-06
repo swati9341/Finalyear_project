@@ -1,15 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Body
 from passlib.hash import bcrypt_sha256
-from database import SessionLocal
-from models.user import User
 from schemas.user_schema import UserCreate, UserLogin
 from utils.jwt_handler import create_access_token
-from utils.db_helpers import create_record, read_record_by_email
+from utils.db_helpers import create_record, read_record_by_email, read_record
 import logging
-
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -21,19 +16,13 @@ bcrypt hashes remain verifiable.
 """
 
 # pwd_context = CryptContext(schemes=["bcrypt_sha256", "bcrypt"], deprecated="auto")
+# The `bcrypt_sha256` import is already present at the top.
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
-from passlib.hash import bcrypt_sha256
 
 @router.post("/register")
-def register(user: UserCreate, db: Session = Depends(get_db)):
+def register(user: UserCreate):
     logger.info(f"Registration attempt for email: {user.email}")
     logger.debug(f"Password length: {len(user.password)}")
     
@@ -41,12 +30,13 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         hashed = bcrypt_sha256.hash(user.password)
         logger.debug(f"Password hashed successfully")
 
-        db_user = User(name=user.name, email=user.email, phone=user.phone, password_hash=hashed)
-        
-        # Create with Supabase-first fallback
+        # Check if user already exists
+        existing_user = read_record_by_email("users", user.email)
+        if existing_user:
+            raise HTTPException(status_code=409, detail="User with this email already exists")
+
+        # Create record directly in Supabase
         created_user = create_record(
-            db,
-            db_user,
             table_name="users",
             supabase_data={
                 "name": user.name,
@@ -59,7 +49,7 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         if not created_user:
             raise HTTPException(status_code=500, detail="Failed to register user")
         
-        logger.info(f"User registered successfully: {user.email}")
+        logger.info(f"User registered successfully: {user.email}, ID: {created_user.get('id')}")
         return {"message": "User registered"}
     except HTTPException:
         raise
@@ -74,17 +64,14 @@ def login(
     user: UserLogin = Body(
         ..., examples={"default": {"summary": "Sample login", "value": UserLogin.Config.json_schema_extra["example"]}},
     ),
-    db: Session = Depends(get_db),
 ):
     logger.info(f"Login attempt for email: {user.email}")
     logger.debug(f"Password length: {len(user.password)}")
     
-    # Query with Supabase-first fallback for existing users
+    # Query Supabase for existing user by email
     fetched_user = read_record_by_email(
-        db,
         "users",
         user.email,
-        lambda: db.query(User).filter(User.email == user.email).first()
     )
     
     if not fetched_user:
@@ -92,13 +79,8 @@ def login(
         raise HTTPException(status_code=400, detail="Invalid credentials")
     
     # Extract user data, handling both SQLAlchemy object and dictionary
-    if isinstance(fetched_user, dict):
-        db_user_id = fetched_user.get("id")
-        password_hash = fetched_user.get("password_hash")
-    else: # SQLAlchemy object
-        db_user_id = fetched_user.id
-        password_hash = fetched_user.password_hash
-        
+    db_user_id = fetched_user.get("id")
+    password_hash = fetched_user.get("password_hash")
     if not password_hash:
         logger.error(f"Password hash not found for user: {user.email}")
         raise HTTPException(status_code=500, detail="Internal server error")

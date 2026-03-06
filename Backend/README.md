@@ -51,7 +51,7 @@ $env:DB_HOST = 'localhost'
 Run the server
 
 ```powershell
-python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Open the API docs (Swagger UI)

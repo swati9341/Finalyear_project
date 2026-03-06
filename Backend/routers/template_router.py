@@ -1,24 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-
-from database import SessionLocal
-from models.invoice_template import InvoiceTemplate as InvoiceTemplateModel
+from fastapi import APIRouter, HTTPException
 from schemas.template_schema import (
     InvoiceTemplateCreate,
     InvoiceTemplate as InvoiceTemplateSchema
 )
 from utils.db_helpers import create_record, read_record, list_records
+from supabase_client import supabase_fallback # Ensure this is imported if not already
+from typing import List, Dict, Any, Optional
 
 router = APIRouter(prefix="/templates", tags=["Invoice Templates"])
 
 
-# ✅ DB Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # ✅ Create Invoice Template
@@ -27,19 +18,14 @@ def get_db():
     response_model=InvoiceTemplateSchema,
     summary="Create an invoice template"
 )
-def create_template(data: InvoiceTemplateCreate, db: Session = Depends(get_db)):
+def create_template(data: InvoiceTemplateCreate):
+    # Check if a template with the same name already exists
+    # Using the custom filter_by method in SupabaseClient
+    existing_template = supabase_fallback.filter_by("invoice_templates", template_name=data.template_name)
+    if existing_template:
+        raise HTTPException(status_code=409, detail=f"Template with name '{data.template_name}' already exists.")
 
-    template = InvoiceTemplateModel(
-        template_name=data.template_name,
-        html_content=data.html_content,
-        type=data.type,
-        mandatory_params=data.mandatory_params
-    )
-
-    # Create with Supabase-first fallback
-    created_template = create_record(
-        db,
-        template,
+    created_template: Optional[Dict[str, Any]] = create_record(
         table_name="invoice_templates",
         supabase_data={
             "template_name": data.template_name,
@@ -52,7 +38,7 @@ def create_template(data: InvoiceTemplateCreate, db: Session = Depends(get_db)):
     if not created_template:
         raise HTTPException(status_code=500, detail="Failed to create template")
 
-    return created_template
+    return InvoiceTemplateSchema(**created_template)
 
 
 # ✅ List All Templates
@@ -61,18 +47,15 @@ def create_template(data: InvoiceTemplateCreate, db: Session = Depends(get_db)):
     response_model=list[InvoiceTemplateSchema],
     summary="List all invoice templates"
 )
-def list_templates(db: Session = Depends(get_db)):
-
-    templates = list_records(
-        db,
+def list_templates():
+    templates: Optional[List[Dict[str, Any]]] = list_records(
         "invoice_templates",
-        lambda: db.query(InvoiceTemplateModel).all()
     )
     
     if templates is None:
         raise HTTPException(status_code=500, detail="Failed to fetch templates")
     
-    return templates
+    return [InvoiceTemplateSchema(**template) for template in templates]
 
 
 # ✅ Get Template by ID
@@ -81,16 +64,12 @@ def list_templates(db: Session = Depends(get_db)):
     response_model=InvoiceTemplateSchema,
     summary="Get invoice template by ID"
 )
-def get_template(template_id: int, db: Session = Depends(get_db)):
-
-    template = read_record(
-        db,
+def get_template(template_id: int):
+    template: Optional[Dict[str, Any]] = read_record(
         "invoice_templates",
         template_id,
-        lambda: db.query(InvoiceTemplateModel).filter(InvoiceTemplateModel.id == template_id).first()
     )
-
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    return template
+    return InvoiceTemplateSchema(**template)

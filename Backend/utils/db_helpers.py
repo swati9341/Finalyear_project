@@ -1,46 +1,29 @@
 """
-Database operation helpers with automatic Supabase fallback.
+Database operation helpers for Supabase.
 Use these functions in your routers instead of direct database operations.
 """
 
 import logging
-from typing import Optional, List, Callable, Any, TypeVar
-from sqlalchemy.orm import Session
-from database_fallback import db_fallback
+from typing import Optional, List, Any, TypeVar, Dict
 from supabase_client import supabase_fallback
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T')
 
-
-def query_primary(db: Session, query_func: Callable[[], Any]) -> Optional[Any]:
-    """
-    Execute a query on the primary database.
-    
-    Usage:
-        user = query_primary(db, lambda: db.query(User).filter(User.email == email).first())
-    """
-    return query_func()
-
-
 def create_record(
-    db: Session,
-    model_instance: T,
     table_name: str,
-    supabase_data: dict
-) -> Optional[T]:
+    supabase_data: Dict[str, Any]
+) -> Optional[Dict[str, Any]]:
     """
-    Create a record with automatic Supabase fallback.
+    Create a record directly in Supabase.
     
     Args:
-        db: SQLAlchemy session
-        model_instance: The model instance to create
         table_name: Table name in Supabase (should match SQLAlchemy table)
         supabase_data: Dictionary of data to insert in Supabase
     
     Returns:
-        The created instance or None if creation fails
+        The created record as a dictionary or None if creation fails
     
     Usage:
         user_data = {"name": "John", "email": "john@example.com", "password_hash": "..."}
@@ -51,28 +34,31 @@ def create_record(
             user_data
         )
     """
-    return db_fallback.create_with_fallback(db, model_instance, table_name, supabase_data)
+    logger.debug(f"Attempting Supabase insert into {table_name} with data: {supabase_data}")
+    created_data = supabase_fallback.insert(table_name, supabase_data)
+    if created_data:
+        logger.info(f"Successfully created record in Supabase table '{table_name}'")
+        return created_data
+    else:
+        logger.error(f"Failed to create record in Supabase table '{table_name}'")
+        return None
 
 
 def read_record(
-    db: Session,
-    fallback_table: str,
-    fallback_id: int,
-    primary_query: Callable[[], Optional[Any]],
-    fallback_id_column: str = "id"
-) -> Optional[Any]:
+    table_name: str,
+    record_id: int,
+    id_column: str = "id"
+) -> Optional[Dict[str, Any]]:
     """
-    Read a record with Supabase as primary and fallback to primary database.
+    Read a record directly from Supabase.
     
     Args:
-        db: SQLAlchemy session
-        fallback_table: Supabase table name
-        fallback_id: ID of the record to fetch
-        primary_query: Lambda function for primary database query
-        fallback_id_column: Column name for ID (defaults to 'id')
+        table_name: Supabase table name
+        record_id: ID of the record to fetch
+        id_column: Column name for ID (defaults to 'id')
     
     Returns:
-        The record or None if not found
+        The record as a dictionary or None if not found
     
     Usage:
         user = read_record(
@@ -82,31 +68,29 @@ def read_record(
             lambda: db.query(User).filter(User.id == user_id).first()
         )
     """
-    def supabase_func():
-        return supabase_fallback.get_by_id(
-            fallback_table, fallback_id, fallback_id_column
-        )
-    
-    return db_fallback.read_with_fallback(supabase_func, primary_query, fallback_table)
+    logger.debug(f"Attempting Supabase read from {table_name} for {id_column}={record_id}")
+    record = supabase_fallback.get_by_id(table_name, record_id, id_column)
+    if record:
+        logger.info(f"Successfully read record from Supabase table '{table_name}' for {id_column}={record_id}")
+        return record
+    else:
+        logger.warning(f"Record not found in Supabase table '{table_name}' for {id_column}={record_id}")
+        return None
 
 
 def read_record_by_email(
-    db: Session,
-    fallback_table: str,
+    table_name: str,
     email: str,
-    primary_query: Callable[[], Optional[Any]]
-) -> Optional[Any]:
+) -> Optional[Dict[str, Any]]:
     """
-    Read a user record by email with Supabase as primary and fallback to primary database.
+    Read a user record by email directly from Supabase.
     
     Args:
-        db: SQLAlchemy session
-        fallback_table: Supabase table name (usually 'users')
+        table_name: Supabase table name (e.g., 'users')
         email: Email address to search for
-        primary_query: Lambda function for primary database query by email
     
     Returns:
-        The record or None if not found
+        The record as a dictionary or None if not found
     
     Usage:
         user = read_record_by_email(
@@ -116,27 +100,26 @@ def read_record_by_email(
             lambda: db.query(User).filter(User.email == "user@example.com").first()
         )
     """
-    def supabase_func():
-        return supabase_fallback.get_by_email(
-            fallback_table, email
-        )
-    
-    return db_fallback.read_with_fallback(supabase_func, primary_query, fallback_table)
+    logger.debug(f"Attempting Supabase read from {table_name} for email={email}")
+    record = supabase_fallback.get_by_email(table_name, email)
+    if record:
+        logger.info(f"Successfully read record from Supabase table '{table_name}' for email={email}")
+        return record
+    else:
+        logger.warning(f"Record not found in Supabase table '{table_name}' for email={email}")
+        return None
 
 
 def update_record(
-    db: Session,
-    db_instance: T,
-    updates: dict,
+    updates: Dict[str, Any],
     table_name: str,
-    id_value: int
-) -> Optional[T]:
+    id_value: int,
+    id_column: str = "id"
+) -> Optional[Dict[str, Any]]:
     """
-    Update a record with automatic Supabase fallback.
+    Update a record directly in Supabase.
     
     Args:
-        db: SQLAlchemy session
-        db_instance: The model instance to update (should be from primary DB)
         updates: Dictionary of fields to update
         table_name: Table name in Supabase
         id_value: ID of the record being updated
@@ -152,22 +135,26 @@ def update_record(
             "users",
             user.id
         )
-    """
-    return db_fallback.update_with_fallback(db, db_instance, updates, table_name, id_value)
+    """    
+    logger.debug(f"Attempting Supabase update in {table_name} for {id_column}={id_value} with data: {updates}")
+    updated_data = supabase_fallback.update(table_name, id_value, updates, id_column)
+    if updated_data:
+        logger.info(f"Successfully updated record in Supabase table '{table_name}' for {id_column}={id_value}")
+        return updated_data
+    else:
+        logger.error(f"Failed to update record in Supabase table '{table_name}' for {id_column}={id_value}")
+        return None
 
 
 def delete_record(
-    db: Session,
-    db_instance: T,
     table_name: str,
-    id_value: int
+    id_value: int,
+    id_column: str = "id"
 ) -> bool:
     """
-    Delete a record with automatic Supabase fallback.
+    Delete a record directly from Supabase.
     
     Args:
-        db: SQLAlchemy session
-        db_instance: The model instance to delete
         table_name: Table name in Supabase
         id_value: ID of the record being deleted
     
@@ -182,24 +169,26 @@ def delete_record(
             user.id
         )
     """
-    return db_fallback.delete_with_fallback(db, db_instance, table_name, id_value)
+    logger.debug(f"Attempting Supabase delete from {table_name} for {id_column}={id_value}")
+    success = supabase_fallback.delete(table_name, id_value, id_column)
+    if success:
+        logger.info(f"Successfully deleted record from Supabase table '{table_name}' for {id_column}={id_value}")
+    else:
+        logger.error(f"Failed to delete record from Supabase table '{table_name}' for {id_column}={id_value}")
+    return success
 
 
 def list_records(
-    db: Session,
-    fallback_table: str,
-    primary_query: Callable[[], List[Any]]
-) -> Optional[List[Any]]:
+    table_name: str,
+) -> Optional[List[Dict[str, Any]]]:
     """
-    List records with Supabase as primary and fallback to primary database.
+    List records directly from Supabase.
     
     Args:
-        db: SQLAlchemy session
-        fallback_table: Supabase table name
-        primary_query: Lambda function for primary database query to get all records
+        table_name: Supabase table name
     
     Returns:
-        List of records or None if query fails
+        List of records as dictionaries or None if query fails
     
     Usage:
         users = list_records(
@@ -208,7 +197,11 @@ def list_records(
             lambda: db.query(User).all()
         )
     """
-    def supabase_func():
-        return supabase_fallback.select(fallback_table)
-    
-    return db_fallback.query_with_fallback(supabase_func, primary_query, fallback_table)
+    logger.debug(f"Attempting Supabase list from {table_name}")
+    records = supabase_fallback.select(table_name)
+    if records is not None:
+        logger.info(f"Successfully listed records from Supabase table '{table_name}'")
+        return records
+    else:
+        logger.error(f"Failed to list records from Supabase table '{table_name}'")
+        return None
