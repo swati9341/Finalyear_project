@@ -2,8 +2,6 @@ fastapi==0.129.1
 uvicorn==0.30.6
 
 # Database
-
-# Supabase
 supabase==2.28.0
 postgrest==2.28.0
 
@@ -24,10 +22,9 @@ httpx==0.28.1
 requests==2.32.5
 
 # PDF generation
-fpdf2==2.7.1
-reportlab==4.2.5
+xhtml2pdf==0.2.15
 
-# Required by FastAPI internally
+# FastAPI dependencies
 pydantic==2.12.5
 starlette==0.52.1
 typing_extensions==4.15.0
