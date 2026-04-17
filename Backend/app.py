@@ -1,9 +1,17 @@
+import os
+from dotenv import load_dotenv, find_dotenv
+
+# Load environment variables FIRST, before importing anything else
+dotenv_path = find_dotenv(usecwd=True)
+if dotenv_path:
+    load_dotenv(dotenv_path)
+else:
+    print("WARNING: .env file not found. Environment variables might not be loaded.")
+
 from fastapi import FastAPI
 from routers import auth
-from database import Base, engine
 from routers import template_router
-from routers import invoice_item_router # Added invoice_item_router
-from models import user, invoice_item, invoice_template, invoice # Added invoice model for relationships
+from routers import invoice_item_router,  home_router
 import logging
 
 # Configure logging
@@ -11,8 +19,6 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Automated Invoice System",
@@ -44,3 +50,4 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(template_router.router)
 app.include_router(invoice_item_router.router) # Included new router
+app.include_router(home_router.router) # Included new home router

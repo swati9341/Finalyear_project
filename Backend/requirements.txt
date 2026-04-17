@@ -1,13 +1,31 @@
-fastapi
-uvicorn
-sqlalchemy
-mysql-connector-python
-passlib[bcrypt]
-python-jose
-pydantic
-reportlab
-python-dotenv
-streamlit
-requests
-streamlit-shadcn-ui
-pyhtml2pdf
+fastapi==0.129.1
+uvicorn==0.30.6
+
+# Database
+supabase==2.28.0
+postgrest==2.28.0
+
+# Auth & security
+python-jose==3.5.0
+passlib==1.7.4
+bcrypt==4.2.0
+cryptography==46.0.5
+
+# Environment variables
+python-dotenv==1.2.1
+
+# Templates
+Jinja2==3.1.6
+
+# HTTP requests
+httpx==0.28.1
+requests==2.32.5
+
+# PDF generation
+xhtml2pdf==0.2.15
+
+# FastAPI dependencies
+pydantic==2.12.5
+starlette==0.52.1
+typing_extensions==4.15.0
+anyio==4.12.1
