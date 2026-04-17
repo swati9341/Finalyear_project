@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from routers import auth
 from database import Base, engine
 from routers import template_router
-from routers import invoice_item_router, demo_router # Added invoice_item_router, demo_router
+from routers import invoice_item_router # Added invoice_item_router
 from models import user, invoice_item, invoice_template, invoice # Added invoice model for relationships
 import logging
 
@@ -44,4 +44,3 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(template_router.router)
 app.include_router(invoice_item_router.router) # Included new router
-app.include_router(demo_router.router) # Included new demo router

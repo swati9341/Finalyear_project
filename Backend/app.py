@@ -11,7 +11,7 @@ else:
 from fastapi import FastAPI
 from routers import auth
 from routers import template_router
-from routers import invoice_item_router, demo_router, home_router
+from routers import invoice_item_router,  home_router
 import logging
 
 # Configure logging
@@ -51,4 +51,3 @@ app.include_router(auth.router)
 app.include_router(template_router.router)
 app.include_router(invoice_item_router.router) # Included new router
 app.include_router(home_router.router) # Included new home router
-app.include_router(demo_router.router) # Included new demo router
